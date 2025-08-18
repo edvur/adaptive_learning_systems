@@ -10,6 +10,7 @@ from sklearn.metrics import accuracy_score
 from imblearn.over_sampling import SMOTE, BorderlineSMOTE
 from imblearn.combine import SMOTETomek
 import joblib
+import pickle
 import time
 import logging
 from concurrent.futures import ProcessPoolExecutor
@@ -236,15 +237,22 @@ class ModelTrainer:
             futures = [executor.submit(train_model_wrapper, task) for task in tasks]
             
             for future in futures:
-                result = future.result()
-                if result:
-                    label, model_name, model, metrics = result
-                    if label not in results:
-                        results[label] = {}
-                    results[label][model_name] = {
-                        'model': model,
-                        'metrics': metrics
-                    }
+                try:
+                    result = future.result(timeout=300)  # 5 minute timeout per task
+                    if result:
+                        label, model_name, model, metrics = result
+                        if label not in results:
+                            results[label] = {}
+                        results[label][model_name] = {
+                            'model': model,
+                            'metrics': metrics
+                        }
+                except TimeoutError:
+                    logger.error("Training task timed out (5 minutes)")
+                    continue
+                except Exception as e:
+                    logger.error(f"Training task failed: {e}")
+                    continue
         
         return results
     
@@ -267,8 +275,12 @@ class ModelTrainer:
             try:
                 models[label] = joblib.load(filepath)
                 logger.info(f"Model loaded: {filepath}")
-            except:
-                logger.warning(f"Could not load model: {filepath}")
+            except FileNotFoundError:
+                logger.warning(f"Model file not found: {filepath}")
+            except (EOFError, pickle.UnpicklingError) as e:
+                logger.error(f"Model file corrupted: {filepath} - {e}")
+            except Exception as e:
+                logger.error(f"Could not load model {filepath}: {e}")
         return models
 
 class TrainingPipeline:

@@ -775,59 +775,137 @@ class AdaptiveLearningEnvironment(gym.Env):
                 self.current_student.learning_velocity = max(0.1, self.current_student.learning_velocity - 0.02)
     
     def _calculate_reward(self, action: TutorAction, response: Dict[str, float]) -> float:
-        """Improved reward system with multiple components"""
+        """Enhanced educational reward system focused on learning outcomes"""
         
-        # Base reward from response components
-        reward = sum(response.get('reward_components', {}).values())
+        # Core Educational Metrics (weighted heavily)
+        performance = response.get('performance', 0)
+        knowledge_gain = response.get('knowledge_gain', 0)
+        engagement_change = response.get('engagement_change', 0)
         
-        # Additional rewards/penalties
+        # 1. LEARNING EFFECTIVENESS (40% of reward)
+        learning_reward = 0
         
-        # Content fit bonus
+        # Performance quality with progressive scaling
+        if performance > 0.8:
+            learning_reward += 2.0  # Excellent performance
+        elif performance > 0.6:
+            learning_reward += 1.0  # Good performance  
+        elif performance > 0.4:
+            learning_reward += 0.3  # Acceptable performance
+        else:
+            learning_reward -= 0.5  # Poor performance penalty
+        
+        # Knowledge gain multiplier
+        learning_reward *= (1.0 + knowledge_gain * 2.0)
+        
+        # 2. ADAPTIVE PERSONALIZATION (25% of reward)
         content = self.content_by_id[action.content_id]
         content_fit = content.get_fit_score(self.current_student.learning_style_analysis)
+        
+        personalization_reward = 0
         if content_fit > 0.8:
-            reward += 0.5
+            personalization_reward += 1.0  # Excellent fit
+        elif content_fit > 0.6:
+            personalization_reward += 0.5  # Good fit
         elif content_fit < 0.3:
-            reward -= 0.3
+            personalization_reward -= 0.8  # Poor fit penalty
         
-        # Adaptive action bonus
-        if action.explanation_depth > 0.7 and self.current_student.error_rate > 0.3:
-            reward += 0.3  # Good adaptation to difficulties
+        # Difficulty appropriateness
+        current_knowledge = self.current_student.current_knowledge.get(content.topic, 0.5)
+        difficulty_gap = abs(content.difficulty - current_knowledge)
+        if difficulty_gap < 0.2:  # Just right
+            personalization_reward += 0.8
+        elif difficulty_gap > 0.5:  # Too hard/easy
+            personalization_reward -= 0.5
         
-        if action.break_suggestion and self.current_student.fatigue_level > 0.8:
-            reward += 0.5  # Timely break
+        # 3. STUDENT WELLBEING (20% of reward)
+        wellbeing_reward = 0
+        
+        # Engagement management
+        if engagement_change > 0:
+            wellbeing_reward += engagement_change * 2.0
+        elif engagement_change < -0.1:
+            wellbeing_reward -= abs(engagement_change) * 3.0
+        
+        # Fatigue management
+        if action.break_suggestion and self.current_student.fatigue_level > 0.7:
+            wellbeing_reward += 1.0  # Appropriate break
         elif action.break_suggestion and self.current_student.fatigue_level < 0.3:
-            reward -= 0.3  # Unnecessary break
+            wellbeing_reward -= 0.5  # Unnecessary break
         
-        # Streak Bonus
+        # Frustration prevention
+        if self.current_student.frustration_level > 0.8:
+            wellbeing_reward -= 2.0  # High frustration penalty
+        elif self.current_student.frustration_level < 0.3:
+            wellbeing_reward += 0.3  # Low frustration bonus
+        
+        # 4. PEDAGOGICAL QUALITY (15% of reward)
+        pedagogical_reward = 0
+        
+        # Appropriate help provision
+        if action.provide_hint and self.current_student.error_rate > 0.4:
+            pedagogical_reward += 0.8  # Good help timing
+        elif action.provide_hint and self.current_student.error_rate < 0.1:
+            pedagogical_reward -= 0.3  # Unnecessary help
+        
+        # Explanation depth appropriateness
+        if action.explanation_depth > 0.7 and self.current_student.error_rate > 0.3:
+            pedagogical_reward += 0.6  # Good detailed explanation
+        elif action.explanation_depth < 0.3 and self.current_student.error_rate > 0.5:
+            pedagogical_reward -= 0.4  # Insufficient explanation
+        
+        # Learning progression tracking
+        if len(self.current_student.recent_performance) >= 3:
+            trend = self._calculate_performance_trend()
+            if trend > 0.1:
+                pedagogical_reward += 1.0  # Improving trend
+            elif trend < -0.1:
+                pedagogical_reward -= 0.6  # Declining trend
+        
+        # 5. COMBINE REWARDS WITH WEIGHTS
+        total_reward = (
+            learning_reward * 0.40 +           # Learning effectiveness
+            personalization_reward * 0.25 +   # Adaptive personalization  
+            wellbeing_reward * 0.20 +          # Student wellbeing
+            pedagogical_reward * 0.15          # Pedagogical quality
+        )
+        
+        # 6. BONUS/PENALTY MODIFIERS
+        
+        # Learning streak bonus
         if len(self.current_student.recent_performance) >= 3:
             if all(p > 0.7 for p in self.current_student.recent_performance[-3:]):
-                reward += 0.5  # Consistently good performance
+                total_reward += 0.8  # Sustained excellence
         
-        # Content diversity bonus
-        recent_types = []
-        for content_id in self.current_student.completed_content[-5:]:
-            if content_id in self.content_by_id:
-                recent_types.append(self.content_by_id[content_id].content_type)
-        
+        # Content diversity bonus (encourage exploration)
+        recent_types = [self.content_by_id[cid].content_type 
+                       for cid in self.current_student.completed_content[-5:] 
+                       if cid in self.content_by_id]
         if len(set(recent_types)) >= 3:
-            reward += 0.2  # Diverse content types
+            total_reward += 0.4
         
-        # Long session penalty
+        # Session length management
         if self.current_student.session_time > 60:
-            reward -= (self.current_student.session_time - 60) * 0.01
+            total_reward -= (self.current_student.session_time - 60) * 0.02
         
-        # Critical state penalties
-        if self.current_student.engagement_level < 0.2:
-            reward -= 1.0
+        # Critical state emergency penalties
+        if self.current_student.engagement_level < 0.15:
+            total_reward -= 3.0  # Emergency: student disengaging
         
-        if self.current_student.frustration_level > 0.8:
-            reward -= 0.8
+        return total_reward
+    
+    def _calculate_performance_trend(self) -> float:
+        """Calculate performance trend from recent history"""
+        if len(self.current_student.recent_performance) < 3:
+            return 0
         
-        # Learning progress bonus
-        avg_knowledge = np.mean(list(self.current_student.current_knowledge.values()))
-        if avg_knowledge > 0.7:
-            reward += 0.3
+        performances = self.current_student.recent_performance[-5:]  # Last 5 episodes
+        x = np.arange(len(performances))
+        try:
+            slope = np.polyfit(x, performances, 1)[0]
+            return slope
+        except:
+            return 0
         
         return reward
     
@@ -1195,7 +1273,7 @@ def create_enhanced_content_library() -> List[LearningContent]:
 def test_improved_rl_environment():
     """Test of improved RL Environment"""
     
-    print("🧪 TESTING IMPROVED RL ENVIRONMENT")
+    print(" TESTING IMPROVED RL ENVIRONMENT")
     print("=" * 60)
     
     # Setup
@@ -1204,7 +1282,7 @@ def test_improved_rl_environment():
     # Initialize integration manager
     integration_manager = TutorIntegrationManager(config)
     if not integration_manager.initialize():
-        print("⚠️ Integration Manager Initialization failed")
+        print(" Integration Manager Initialization failed")
         return
     
     # Create Content Library
@@ -1225,7 +1303,7 @@ def test_improved_rl_environment():
     print(f"   Observation Space: {env.observation_space.shape}")
     
     # Test 1: Reset and Observation
-    print(f"\n🔄 TEST 1: Environment Reset")
+    print(f"\n TEST 1: Environment Reset")
     obs = env.reset("test_student_001")
     print(f"   Observation Shape: {obs.shape}")
     print(f"   Observation Range: [{obs.min():.3f}, {obs.max():.3f}]")
@@ -1256,22 +1334,22 @@ def test_improved_rl_environment():
             break
     
     # Test 3: Student Summary
-    print(f"\n📊 TEST 3: Student Summary")
+    print(f"\n TEST 3: Student Summary")
     summary = env.get_student_summary()
     
-    print(f"\n🎨 Learning Style:")
+    print(f"\n Learning Style:")
     for dim, style in summary['learning_style'].items():
         print(f"   {dim}: {style}")
     
-    print(f"\n📊 State Metrics:")
+    print(f"\n State Metrics:")
     for metric, value in summary['state_metrics'].items():
         print(f"   {metric}: {value}")
     
-    print(f"\n🧠 Learning Metrics:")
+    print(f"\nLearning Metrics:")
     for metric, value in summary['learning_metrics'].items():
         print(f"   {metric}: {value}")
     
-    print(f"\n⏱️ Session Info:")
+    print(f"\n⏱ Session Info:")
     print(f"   Time: {summary['session_info']['session_time']} min")
     print(f"   Completed Content: {summary['session_info']['completed_content']}")
     
@@ -1301,7 +1379,7 @@ def test_improved_rl_environment():
         print(f"   Avg Performance: {np.mean(performances):.3f}")
     
     # Test 5: Content Fit Analysis
-    print(f"\n🔍 TEST 5: Content Fit Analysis")
+    print(f"\n TEST 5: Content Fit Analysis")
     
     student_style = env.current_student.learning_style_analysis
     
@@ -1309,7 +1387,7 @@ def test_improved_rl_environment():
     for dim, analysis in student_style.items():
         print(f"   {dim}: {analysis['interpretation']} ({analysis['confidence']:.2%})")
     
-    print(f"\n🏆 Top 5 Content Fits:")
+    print(f"\n Top 5 Content Fits:")
     content_fits = []
     for content in content_library:
         fit = content.get_fit_score(student_style)
@@ -1321,7 +1399,7 @@ def test_improved_rl_environment():
         print(f"   {content.title}: {fit:.3f}")
         print(f"     Type: {content.content_type.value}, Difficulty: {content.difficulty}")
     
-    print(f"\n✅ IMPROVED RL ENVIRONMENT TEST SUCCESSFUL!")
+    print(f"\n IMPROVED RL ENVIRONMENT TEST SUCCESSFUL!")
     
     return env
 

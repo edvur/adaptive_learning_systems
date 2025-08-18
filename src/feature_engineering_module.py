@@ -201,7 +201,7 @@ class FeatureEngineer:
         else:
             raise ValueError(f"Unknown scaling method: {method}")
         
-        self.scaler_feature_names= list(X.columns)
+        self.scaler_feature_names = list(X.columns)
         # Fit and transform the data
         if self.scaler is None:
             raise ValueError("Scaler must be initialized!")
@@ -229,8 +229,7 @@ class FeatureEngineer:
         # Scaling (if available)
         if self.scaler is not None:
             if hasattr(self, 'scaler_feature_names') and self.scaler_feature_names is not None:
-            # Make sure that all expected features are available in right order
-
+                # Make sure that all expected features are available in right order
                 X_transformed = X_transformed[self.scaler_feature_names]
             
             X_transformed = pd.DataFrame(

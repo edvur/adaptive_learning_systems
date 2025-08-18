@@ -833,9 +833,10 @@ class ImprovedTrainingPipeline:
                     
                     self._log_evaluation_results(episode, eval_metrics)
                     
-                    # Early stopping
-                    if (self.training_metrics['episodes_without_improvement'] > 
-                        self.training_config['early_stopping_patience'] and
+                    # Early stopping (only if patience is not None)
+                    early_stopping_patience = self.training_config.get('early_stopping_patience')
+                    if (early_stopping_patience is not None and
+                        self.training_metrics['episodes_without_improvement'] > early_stopping_patience and
                         episode > self.training_config['min_episodes']):
                         
                         logger.info("Early stopping triggered")
@@ -1142,6 +1143,541 @@ class ImprovedTrainingPipeline:
         plt.close()
         
         logger.info(f"Detailed analysis plots saved to {detail_path}")
+        
+        # Generate thesis-ready plots
+        self.create_thesis_ready_plots()
+    
+    def create_thesis_ready_plots(self):
+        """Create comprehensive thesis-ready deep RL performance visualizations"""
+        print("\nGenerating thesis-ready Deep RL performance plots...")
+        
+        # Set style for thesis-quality plots
+        plt.style.use('seaborn-v0_8-whitegrid')
+        plt.rcParams.update({
+            'font.size': 12,
+            'font.family': 'serif',
+            'figure.dpi': 300,
+            'savefig.dpi': 300,
+            'savefig.bbox': 'tight',
+            'savefig.facecolor': 'white'
+        })
+        
+        # 1. Main DQN Training Overview
+        self.create_dqn_training_overview()
+        
+        # 2. Learning Convergence Analysis
+        self.create_learning_convergence_plots()
+        
+        # 3. Agent Performance Metrics
+        self.create_agent_performance_plots()
+        
+        # 4. Educational Effectiveness Analysis
+        self.create_educational_effectiveness_plots()
+        
+        print("✓ Thesis-ready Deep RL plots generated:")
+        print(f"  - {self.save_dir / 'thesis_dqn_training_overview.png'}")
+        print(f"  - {self.save_dir / 'thesis_learning_convergence.png'}")
+        print(f"  - {self.save_dir / 'thesis_agent_performance.png'}")
+        print(f"  - {self.save_dir / 'thesis_educational_effectiveness.png'}")
+    
+    def create_dqn_training_overview(self):
+        """Create main DQN training overview plot"""
+        fig = plt.figure(figsize=(16, 12))
+        
+        # 1. Episode Rewards (top plot)
+        ax1 = plt.subplot(3, 3, (1, 3))
+        rewards = self.training_metrics['episode_rewards']
+        episodes = np.arange(len(rewards))
+        
+        # Raw and smoothed rewards
+        ax1.plot(episodes, rewards, alpha=0.3, color='lightblue', label='Raw Rewards')
+        
+        if len(rewards) > 50:
+            window = min(100, len(rewards) // 10)
+            smoothed = np.convolve(rewards, np.ones(window)/window, mode='valid')
+            smooth_episodes = episodes[window-1:]
+            ax1.plot(smooth_episodes, smoothed, color='#2E86AB', linewidth=2, 
+                    label=f'Smoothed ({window} episodes)')
+        
+        # Mark evaluation points
+        if len(self.training_metrics['eval_rewards']) > 0:
+            eval_episodes = np.arange(len(self.training_metrics['eval_rewards'])) * self.training_config['eval_interval']
+            eval_rewards = self.training_metrics['eval_rewards']
+            ax1.scatter(eval_episodes, eval_rewards, color='red', s=50, 
+                       label='Evaluation Points', zorder=5)
+        
+        ax1.set_ylabel('Episode Reward', fontweight='bold')
+        ax1.set_title('Deep Q-Network Training Progress: Episode Rewards', 
+                     fontsize=14, fontweight='bold', pad=20)
+        ax1.legend(loc='lower right', frameon=True, fancybox=True, shadow=True)
+        ax1.grid(True, alpha=0.3)
+        
+        # Add best reward line
+        if hasattr(self.training_metrics, 'best_eval_reward'):
+            ax1.axhline(y=self.training_metrics['best_eval_reward'], 
+                       color='green', linestyle='--', alpha=0.7, 
+                       label=f'Best: {self.training_metrics["best_eval_reward"]:.2f}')
+        
+        # 2. Training Loss
+        ax2 = plt.subplot(3, 3, 4)
+        losses = list(self.agent.metrics['losses'])
+        if len(losses) > 0:
+            ax2.plot(losses, color='#A23B72', alpha=0.7)
+            if len(losses) > 50:
+                window = min(50, len(losses) // 10)
+                smoothed_loss = np.convolve(losses, np.ones(window)/window, mode='valid')
+                ax2.plot(smoothed_loss, color='#592941', linewidth=2, 
+                        label=f'Smoothed ({window})')
+                ax2.legend()
+            
+        ax2.set_xlabel('Training Steps', fontweight='bold')
+        ax2.set_ylabel('Loss', fontweight='bold')
+        ax2.set_title('Q-Network Loss Convergence', fontweight='bold')
+        ax2.set_yscale('log')
+        ax2.grid(True, alpha=0.3)
+        
+        # 3. Q-Values Evolution
+        ax3 = plt.subplot(3, 3, 5)
+        q_values = list(self.agent.metrics['q_values'])
+        if len(q_values) > 0:
+            ax3.plot(q_values, color='#F18F01', alpha=0.8)
+            ax3.set_xlabel('Training Steps', fontweight='bold')
+            ax3.set_ylabel('Average Q-Value', fontweight='bold')
+            ax3.set_title('Q-Value Evolution', fontweight='bold')
+            ax3.grid(True, alpha=0.3)
+        
+        # 4. Epsilon Decay
+        ax4 = plt.subplot(3, 3, 6)
+        if len(rewards) > 0:
+            epsilons = []
+            for i in range(len(rewards)):
+                epsilon = max(
+                    self.agent.config['epsilon_end'],
+                    self.agent.config['epsilon_start'] * (self.agent.config['epsilon_decay'] ** i)
+                )
+                epsilons.append(epsilon)
+            
+            ax4.plot(episodes, epsilons, color='#C73E1D', linewidth=2)
+            ax4.axhline(y=self.agent.config['epsilon_end'], 
+                       color='red', linestyle='--', alpha=0.7, 
+                       label=f'Min ε = {self.agent.config["epsilon_end"]}')
+            ax4.set_xlabel('Episode', fontweight='bold')
+            ax4.set_ylabel('Epsilon (ε)', fontweight='bold')
+            ax4.set_title('Exploration vs Exploitation Balance', fontweight='bold')
+            ax4.legend()
+            ax4.grid(True, alpha=0.3)
+        
+        # 5. Student Performance Progress
+        ax5 = plt.subplot(3, 3, 7)
+        performances = self.training_metrics['episode_performances']
+        if len(performances) > 0:
+            ax5.plot(episodes, performances, alpha=0.4, color='lightgreen', 
+                    label='Raw Performance')
+            
+            if len(performances) > 50:
+                window = min(100, len(performances) // 10)
+                smoothed_perf = np.convolve(performances, np.ones(window)/window, mode='valid')
+                smooth_episodes = episodes[window-1:]
+                ax5.plot(smooth_episodes, smoothed_perf, color='#2E8B57', linewidth=2, 
+                        label=f'Smoothed ({window})')
+            
+            ax5.set_xlabel('Episode', fontweight='bold')
+            ax5.set_ylabel('Student Performance', fontweight='bold')
+            ax5.set_title('Student Learning Progress', fontweight='bold')
+            ax5.set_ylim([0, 1])
+            ax5.legend()
+            ax5.grid(True, alpha=0.3)
+        
+        # 6. Episode Length Efficiency
+        ax6 = plt.subplot(3, 3, 8)
+        lengths = self.training_metrics['episode_lengths']
+        if len(lengths) > 0:
+            ax6.plot(episodes, lengths, alpha=0.5, color='orange', label='Episode Length')
+            
+            if len(lengths) > 50:
+                window = min(100, len(lengths) // 10)
+                smoothed_len = np.convolve(lengths, np.ones(window)/window, mode='valid')
+                smooth_episodes = episodes[window-1:]
+                ax6.plot(smooth_episodes, smoothed_len, color='#FF6347', linewidth=2, 
+                        label=f'Smoothed ({window})')
+            
+            ax6.set_xlabel('Episode', fontweight='bold')
+            ax6.set_ylabel('Steps per Episode', fontweight='bold')
+            ax6.set_title('Episode Length Evolution', fontweight='bold')
+            ax6.legend()
+            ax6.grid(True, alpha=0.3)
+        
+        # 7. Learning Rate Schedule
+        ax7 = plt.subplot(3, 3, 9)
+        learning_rates = list(self.agent.metrics['learning_rates'])
+        if len(learning_rates) > 0:
+            ax7.plot(learning_rates, color='purple', linewidth=2)
+            ax7.set_xlabel('Training Steps', fontweight='bold')
+            ax7.set_ylabel('Learning Rate', fontweight='bold')
+            ax7.set_title('Learning Rate Schedule', fontweight='bold')
+            ax7.set_yscale('log')
+            ax7.grid(True, alpha=0.3)
+        
+        plt.tight_layout()
+        plt.savefig(self.save_dir / 'thesis_dqn_training_overview.png', dpi=300, bbox_inches='tight')
+        plt.close()
+    
+    def create_learning_convergence_plots(self):
+        """Create learning convergence analysis plots"""
+        fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+        
+        # 1. Reward vs Performance Correlation
+        ax1 = axes[0, 0]
+        if (len(self.training_metrics['episode_rewards']) > 0 and 
+            len(self.training_metrics['episode_performances']) > 0):
+            
+            rewards = np.array(self.training_metrics['episode_rewards'])
+            performances = np.array(self.training_metrics['episode_performances'])
+            
+            # Scatter plot with color gradient
+            episodes = np.arange(len(rewards))
+            scatter = ax1.scatter(performances, rewards, c=episodes, cmap='viridis', 
+                                 alpha=0.6, s=20)
+            
+            # Add trend line
+            if len(rewards) > 10:
+                z = np.polyfit(performances, rewards, 1)
+                p = np.poly1d(z)
+                perf_sorted = np.linspace(performances.min(), performances.max(), 100)
+                ax1.plot(perf_sorted, p(perf_sorted), "r--", alpha=0.8, linewidth=2,
+                        label=f'Trend: {z[0]:.2f}x + {z[1]:.2f}')
+                
+                # Calculate correlation
+                correlation = np.corrcoef(performances, rewards)[0, 1]
+                ax1.text(0.05, 0.95, f'Correlation: {correlation:.3f}', 
+                        transform=ax1.transAxes, fontweight='bold',
+                        bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8))
+            
+            ax1.set_xlabel('Student Performance', fontweight='bold')
+            ax1.set_ylabel('Episode Reward', fontweight='bold')
+            ax1.set_title('Performance-Reward Correlation', fontweight='bold')
+            ax1.legend()
+            ax1.grid(True, alpha=0.3)
+            
+            # Add colorbar
+            cbar = plt.colorbar(scatter, ax=ax1)
+            cbar.set_label('Training Episode', fontweight='bold')
+        
+        # 2. Loss Convergence Analysis
+        ax2 = axes[0, 1]
+        losses = list(self.agent.metrics['losses'])
+        if len(losses) > 100:
+            # Split into phases
+            phase_size = len(losses) // 4
+            phases = ['Early', 'Mid-Early', 'Mid-Late', 'Late']
+            colors = ['red', 'orange', 'yellow', 'green']
+            
+            for i, (phase, color) in enumerate(zip(phases, colors)):
+                start = i * phase_size
+                end = (i + 1) * phase_size if i < 3 else len(losses)
+                phase_losses = losses[start:end]
+                
+                if len(phase_losses) > 0:
+                    ax2.hist(phase_losses, bins=30, alpha=0.6, label=phase, 
+                            color=color, density=True)
+            
+            ax2.set_xlabel('Loss Value', fontweight='bold')
+            ax2.set_ylabel('Density', fontweight='bold')
+            ax2.set_title('Loss Distribution Evolution', fontweight='bold')
+            ax2.legend()
+            ax2.set_xscale('log')
+            ax2.grid(True, alpha=0.3)
+        
+        # 3. Convergence Rate Analysis
+        ax3 = axes[1, 0]
+        if len(self.training_metrics['eval_rewards']) > 5:
+            eval_rewards = np.array(self.training_metrics['eval_rewards'])
+            eval_episodes = np.arange(len(eval_rewards)) * self.training_config['eval_interval']
+            
+            # Moving average convergence
+            window_sizes = [3, 5, 7]
+            colors = ['blue', 'green', 'red']
+            
+            for window, color in zip(window_sizes, colors):
+                if len(eval_rewards) > window:
+                    moving_avg = np.convolve(eval_rewards, np.ones(window)/window, mode='valid')
+                    ax3.plot(eval_episodes[window-1:], moving_avg, 
+                            label=f'MA({window})', color=color, linewidth=2)
+            
+            ax3.scatter(eval_episodes, eval_rewards, color='black', s=30, 
+                       label='Evaluation Points', zorder=5)
+            ax3.set_xlabel('Training Episode', fontweight='bold')
+            ax3.set_ylabel('Average Reward', fontweight='bold')
+            ax3.set_title('Convergence Rate Analysis', fontweight='bold')
+            ax3.legend()
+            ax3.grid(True, alpha=0.3)
+        
+        # 4. Training Stability Metrics
+        ax4 = axes[1, 1]
+        if len(self.training_metrics['episode_rewards']) > 100:
+            rewards = np.array(self.training_metrics['episode_rewards'])
+            
+            # Rolling standard deviation
+            window = 50
+            rolling_std = np.array([np.std(rewards[max(0, i-window):i+1]) 
+                                   for i in range(len(rewards))])
+            
+            episodes = np.arange(len(rewards))
+            ax4.plot(episodes, rolling_std, color='purple', linewidth=2, 
+                    label=f'Rolling Std ({window} episodes)')
+            
+            # Overall trend
+            if len(rolling_std) > 10:
+                z = np.polyfit(episodes, rolling_std, 1)
+                p = np.poly1d(z)
+                ax4.plot(episodes, p(episodes), "r--", alpha=0.8, linewidth=2,
+                        label=f'Trend: {z[0]:.6f}x + {z[1]:.3f}')
+            
+            ax4.set_xlabel('Training Episode', fontweight='bold')
+            ax4.set_ylabel('Reward Standard Deviation', fontweight='bold')
+            ax4.set_title('Training Stability Analysis', fontweight='bold')
+            ax4.legend()
+            ax4.grid(True, alpha=0.3)
+        
+        plt.tight_layout()
+        plt.savefig(self.save_dir / 'thesis_learning_convergence.png', dpi=300, bbox_inches='tight')
+        plt.close()
+    
+    def create_agent_performance_plots(self):
+        """Create agent-specific performance analysis plots"""
+        fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+        
+        # 1. Q-Value Distribution Evolution
+        ax1 = axes[0, 0]
+        q_values = list(self.agent.metrics['q_values'])
+        if len(q_values) > 100:
+            # Sample Q-values at different training phases
+            phases = ['Early (0-25%)', 'Mid (25-75%)', 'Late (75-100%)']
+            phase_indices = [
+                (0, len(q_values)//4),
+                (len(q_values)//4, 3*len(q_values)//4),
+                (3*len(q_values)//4, len(q_values))
+            ]
+            colors = ['red', 'orange', 'green']
+            
+            for (start, end), phase, color in zip(phase_indices, phases, colors):
+                phase_qvals = q_values[start:end]
+                if len(phase_qvals) > 0:
+                    ax1.hist(phase_qvals, bins=30, alpha=0.6, label=phase, 
+                            color=color, density=True)
+            
+            ax1.set_xlabel('Q-Value', fontweight='bold')
+            ax1.set_ylabel('Density', fontweight='bold')
+            ax1.set_title('Q-Value Distribution Evolution', fontweight='bold')
+            ax1.legend()
+            ax1.grid(True, alpha=0.3)
+        
+        # 2. TD Error Analysis
+        ax2 = axes[0, 1]
+        td_errors = list(self.agent.metrics['td_errors'])
+        if len(td_errors) > 0:
+            # Plot TD errors with trend
+            steps = np.arange(len(td_errors))
+            ax2.plot(steps, td_errors, alpha=0.3, color='lightcoral', label='Raw TD Errors')
+            
+            if len(td_errors) > 50:
+                window = min(100, len(td_errors) // 10)
+                smoothed_td = np.convolve(td_errors, np.ones(window)/window, mode='valid')
+                ax2.plot(steps[window-1:], smoothed_td, color='darkred', linewidth=2, 
+                        label=f'Smoothed ({window})')
+            
+            ax2.set_xlabel('Training Steps', fontweight='bold')
+            ax2.set_ylabel('TD Error', fontweight='bold')
+            ax2.set_title('Temporal Difference Error Evolution', fontweight='bold')
+            ax2.set_yscale('log')
+            ax2.legend()
+            ax2.grid(True, alpha=0.3)
+        
+        # 3. Learning Efficiency
+        ax3 = axes[1, 0]
+        if (len(self.training_metrics['episode_rewards']) > 0 and 
+            len(self.training_metrics['episode_lengths']) > 0):
+            
+            rewards = np.array(self.training_metrics['episode_rewards'])
+            lengths = np.array(self.training_metrics['episode_lengths'])
+            
+            # Calculate efficiency (reward per step)
+            efficiency = np.divide(rewards, lengths, out=np.zeros_like(rewards), where=lengths!=0)
+            episodes = np.arange(len(efficiency))
+            
+            ax3.plot(episodes, efficiency, alpha=0.4, color='lightblue', label='Raw Efficiency')
+            
+            if len(efficiency) > 50:
+                window = min(100, len(efficiency) // 10)
+                smoothed_eff = np.convolve(efficiency, np.ones(window)/window, mode='valid')
+                ax3.plot(episodes[window-1:], smoothed_eff, color='navy', linewidth=2, 
+                        label=f'Smoothed ({window})')
+            
+            ax3.set_xlabel('Episode', fontweight='bold')
+            ax3.set_ylabel('Reward per Step', fontweight='bold')
+            ax3.set_title('Learning Efficiency (Reward/Step)', fontweight='bold')
+            ax3.legend()
+            ax3.grid(True, alpha=0.3)
+        
+        # 4. Exploration vs Exploitation Analysis
+        ax4 = axes[1, 1]
+        if len(self.training_metrics['episode_rewards']) > 0:
+            episodes = np.arange(len(self.training_metrics['episode_rewards']))
+            
+            # Calculate exploration percentage over time
+            exploration_rate = []
+            for i in episodes:
+                epsilon = max(
+                    self.agent.config['epsilon_end'],
+                    self.agent.config['epsilon_start'] * (self.agent.config['epsilon_decay'] ** i)
+                )
+                exploration_rate.append(epsilon * 100)
+            
+            ax4.plot(episodes, exploration_rate, color='purple', linewidth=2, 
+                    label='Exploration Rate (%)')
+            
+            # Add exploitation percentage
+            exploitation_rate = [100 - exp for exp in exploration_rate]
+            ax4.plot(episodes, exploitation_rate, color='green', linewidth=2, 
+                    label='Exploitation Rate (%)')
+            
+            ax4.fill_between(episodes, 0, exploration_rate, alpha=0.3, color='purple')
+            ax4.fill_between(episodes, exploration_rate, 100, alpha=0.3, color='green')
+            
+            ax4.set_xlabel('Episode', fontweight='bold')
+            ax4.set_ylabel('Percentage (%)', fontweight='bold')
+            ax4.set_title('Exploration vs Exploitation Balance', fontweight='bold')
+            ax4.set_ylim([0, 100])
+            ax4.legend()
+            ax4.grid(True, alpha=0.3)
+        
+        plt.tight_layout()
+        plt.savefig(self.save_dir / 'thesis_agent_performance.png', dpi=300, bbox_inches='tight')
+        plt.close()
+    
+    def create_educational_effectiveness_plots(self):
+        """Create educational effectiveness analysis plots"""
+        fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+        
+        # 1. Student Performance Distribution
+        ax1 = axes[0, 0]
+        performances = self.training_metrics['episode_performances']
+        if len(performances) > 50:
+            # Performance distribution over training phases
+            phase_size = len(performances) // 3
+            phases = ['Early Training', 'Mid Training', 'Late Training']
+            colors = ['red', 'orange', 'green']
+            
+            for i, (phase, color) in enumerate(zip(phases, colors)):
+                start = i * phase_size
+                end = (i + 1) * phase_size if i < 2 else len(performances)
+                phase_perfs = performances[start:end]
+                
+                ax1.hist(phase_perfs, bins=20, alpha=0.6, label=phase, 
+                        color=color, density=True)
+            
+            ax1.set_xlabel('Student Performance Score', fontweight='bold')
+            ax1.set_ylabel('Density', fontweight='bold')
+            ax1.set_title('Student Performance Distribution Evolution', fontweight='bold')
+            ax1.legend()
+            ax1.grid(True, alpha=0.3)
+        
+        # 2. Learning Progress Trajectory
+        ax2 = axes[0, 1]
+        if len(performances) > 0:
+            episodes = np.arange(len(performances))
+            
+            # Raw performance
+            ax2.plot(episodes, performances, alpha=0.3, color='lightblue', label='Raw Performance')
+            
+            # Trend analysis
+            if len(performances) > 10:
+                # Polynomial fit for learning curve
+                z = np.polyfit(episodes, performances, 2)  # Quadratic fit
+                p = np.poly1d(z)
+                ax2.plot(episodes, p(episodes), color='darkblue', linewidth=3, 
+                        label='Learning Trajectory (Quadratic Fit)')
+                
+                # Calculate learning rate (derivative)
+                learning_rate = np.gradient(p(episodes))
+                ax2_twin = ax2.twinx()
+                ax2_twin.plot(episodes, learning_rate, color='red', linestyle='--', 
+                             alpha=0.8, label='Learning Rate')
+                ax2_twin.set_ylabel('Learning Rate', fontweight='bold', color='red')
+                ax2_twin.tick_params(axis='y', labelcolor='red')
+            
+            ax2.set_xlabel('Training Episode', fontweight='bold')
+            ax2.set_ylabel('Student Performance', fontweight='bold')
+            ax2.set_title('Learning Progress Trajectory', fontweight='bold')
+            ax2.set_ylim([0, 1])
+            ax2.legend(loc='upper left')
+            ax2.grid(True, alpha=0.3)
+        
+        # 3. Adaptive Behavior Analysis
+        ax3 = axes[1, 0]
+        if len(self.training_metrics['eval_rewards']) > 3:
+            eval_rewards = np.array(self.training_metrics['eval_rewards'])
+            eval_performances = np.array(self.training_metrics['eval_performances']) if hasattr(self.training_metrics, 'eval_performances') else None
+            eval_episodes = np.arange(len(eval_rewards)) * self.training_config['eval_interval']
+            
+            # Dual y-axis plot
+            ax3.plot(eval_episodes, eval_rewards, 'b-o', linewidth=2, markersize=6, 
+                    label='Agent Reward', color='blue')
+            ax3.set_xlabel('Training Episode', fontweight='bold')
+            ax3.set_ylabel('Agent Reward', fontweight='bold', color='blue')
+            ax3.tick_params(axis='y', labelcolor='blue')
+            
+            if eval_performances is not None and len(eval_performances) > 0:
+                ax3_twin = ax3.twinx()
+                ax3_twin.plot(eval_episodes, eval_performances, 'r-s', linewidth=2, markersize=6, 
+                             label='Student Performance', color='red')
+                ax3_twin.set_ylabel('Student Performance', fontweight='bold', color='red')
+                ax3_twin.tick_params(axis='y', labelcolor='red')
+                ax3_twin.set_ylim([0, 1])
+            
+            ax3.set_title('Agent-Student Performance Alignment', fontweight='bold')
+            ax3.grid(True, alpha=0.3)
+        
+        # 4. Educational Impact Summary
+        ax4 = axes[1, 1]
+        if len(performances) > 100:
+            # Calculate key educational metrics
+            initial_performance = np.mean(performances[:20])  # First 20 episodes
+            final_performance = np.mean(performances[-20:])   # Last 20 episodes
+            improvement = final_performance - initial_performance
+            
+            # Performance consistency (lower std is better)
+            early_std = np.std(performances[:len(performances)//3])
+            late_std = np.std(performances[-len(performances)//3:])
+            
+            # Create summary bar chart
+            metrics = ['Initial\nPerformance', 'Final\nPerformance', 'Improvement', 
+                      'Early\nStability', 'Late\nStability']
+            values = [initial_performance, final_performance, improvement, 
+                     1-early_std, 1-late_std]  # Invert std for "stability"
+            colors = ['lightcoral', 'lightgreen', 'gold', 'lightblue', 'lightpink']
+            
+            bars = ax4.bar(metrics, values, color=colors, alpha=0.8, 
+                          edgecolor='black', linewidth=0.5)
+            
+            # Add value labels
+            for bar, value in zip(bars, values):
+                height = bar.get_height()
+                ax4.annotate(f'{value:.3f}',
+                           xy=(bar.get_x() + bar.get_width() / 2, height),
+                           xytext=(0, 3),
+                           textcoords="offset points",
+                           ha='center', va='bottom', fontweight='bold')
+            
+            ax4.set_ylabel('Score', fontweight='bold')
+            ax4.set_title('Educational Impact Summary', fontweight='bold')
+            ax4.set_ylim([0, 1])
+            ax4.tick_params(axis='x', rotation=45)
+            ax4.grid(True, alpha=0.3)
+        
+        plt.tight_layout()
+        plt.savefig(self.save_dir / 'thesis_educational_effectiveness.png', dpi=300, bbox_inches='tight')
+        plt.close()
 
 
 def run_training_experiment(config_name: str = 'standard'):
@@ -1184,6 +1720,23 @@ def run_training_experiment(config_name: str = 'standard'):
                 'epsilon_decay': 0.9998
             },
             'description': 'Intensive training for best results'
+        },
+        'research': {
+            'num_episodes': 3000,
+            'agent_config': {
+                'learning_rate': 0.0005,  # Higher learning rate
+                'batch_size': 256,        # Larger batch size
+                'memory_size': 200000,    # Larger memory
+                'target_update_freq': 500, # More frequent updates
+                'epsilon_decay': 0.9999,  # Slower epsilon decay for more exploration
+                'epsilon_end': 0.05       # Higher minimum epsilon
+            },
+            'training_config': {
+                'early_stopping_patience': None,  # Disable early stopping
+                'eval_interval': 100,
+                'min_episodes': 500
+            },
+            'description': 'Research configuration with disabled early stopping and improved exploration'
         }
     }
     
@@ -1239,6 +1792,11 @@ def run_training_experiment(config_name: str = 'standard'):
         save_dir=f"improved_models_{config_name}"
     )
     
+    # Apply custom training config if specified
+    if 'training_config' in selected_config:
+        pipeline.training_config.update(selected_config['training_config'])
+        print(f"Applied custom training config: {selected_config['training_config']}")
+    
     # Run training
     print(f"\n Starting training...")
     print(f"This may take a while. Check logs in: {pipeline.save_dir}/logs/")
@@ -1287,7 +1845,7 @@ if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description='Improved DQN Training')
     parser.add_argument('--config', type=str, default='standard',
-                        choices=['debug', 'standard', 'intensive'],
+                        choices=['debug', 'standard', 'intensive', 'research'],
                         help='Training configuration to use')
     parser.add_argument('--test', action='store_true',
                         help='Run quick test')

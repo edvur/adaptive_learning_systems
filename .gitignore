@@ -1,0 +1,14 @@
+# Python/Env
+bavenv/
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# OS & IDE
+.DS_Store
+.vscode/
+
+# Outputs/Daten
+3_label_results/
+data/

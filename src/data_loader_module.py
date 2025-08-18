@@ -7,6 +7,7 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 from typing import Tuple, Dict
 import logging
+from config import get_config
 
 # Logging setup
 logging.basicConfig(level=logging.INFO)
@@ -15,10 +16,10 @@ logger = logging.getLogger(__name__)
 class DataLoader:
     """Class for loading and preprocessing the learning style data"""
     
-    def __init__(self, csms_path: str = '/Users/edavurmaz/Uni/Bachelorarbeit/adaptive_tutoring_system/data/CSMS.xlsx', 
-                 cshs_path: str = '/Users/edavurmaz/Uni/Bachelorarbeit/adaptive_tutoring_system/data/CSHS.xlsx'):
-        self.csms_path = csms_path
-        self.cshs_path = cshs_path
+    def __init__(self, csms_path: str = None, cshs_path: str = None):
+        config = get_config()
+        self.csms_path = csms_path or config.get_data_path('csms')
+        self.cshs_path = cshs_path or config.get_data_path('cshs')
         self.target_cols = ['Perception', 'Input', 'Understanding']
         self.feature_cols = [
             'Course overview', 'Reading file', 'Abstract materiale', 

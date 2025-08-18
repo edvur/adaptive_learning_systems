@@ -1,0 +1,42 @@
+# Adaptive Learning System - Requirements
+# Author: Eda Vurmaz
+# Python 3.8+ required
+
+# Core Data Science Libraries
+pandas==1.5.3
+numpy==1.24.3
+openpyxl==3.1.2  # For Excel file reading
+
+# Machine Learning
+scikit-learn==1.2.2
+xgboost==1.7.5
+lightgbm==3.3.5
+imbalanced-learn==0.10.1
+
+# Deep Learning
+torch==2.0.1  # PyTorch for DQN
+# Note: For GPU support, install torch with CUDA:
+# pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+
+# Web Application
+streamlit==1.25.0
+streamlit-option-menu==0.3.6
+
+# Visualization
+matplotlib==3.7.1
+seaborn==0.12.2
+plotly==5.14.1
+
+# Utilities
+joblib==1.2.0  # Model persistence
+tqdm==4.65.0   # Progress bars
+python-dotenv==1.0.0  # Environment variables
+
+# Optional but recommended
+pytest==7.3.1  # For running tests
+black==23.3.0  # Code formatting
+pylint==2.17.4  # Code linting
+
+# For Jupyter notebooks (if needed)
+jupyter==1.0.0
+ipywidgets==8.0.6
