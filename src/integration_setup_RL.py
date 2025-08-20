@@ -6,12 +6,12 @@ import numpy as np
 import pandas as pd
 import gym
 from gym import spaces
-from typing import Dict, List, Tuple, Optional, Any, Union
+from typing import Dict, List, Tuple, Optional
 from dataclasses import dataclass, asdict, field
 from enum import Enum
 import logging
 import random
-from pathlib import Path
+
 
 # Import Integration Manager and Configuration
 from integration_LS_AT import TutorIntegrationManager, Config
@@ -320,7 +320,7 @@ class TutorAction:
         }
 
 class AdaptiveLearningEnvironment(gym.Env):
-    """Improved RL environment for adaptive learning tutor"""
+    """RL environment for adaptive learning tutor"""
     
     def __init__(self, 
                  integration_manager: TutorIntegrationManager,
@@ -1271,9 +1271,9 @@ def create_enhanced_content_library() -> List[LearningContent]:
 
 
 def test_improved_rl_environment():
-    """Test of improved RL Environment"""
+    """Test RL Environment"""
     
-    print(" TESTING IMPROVED RL ENVIRONMENT")
+    print(" TESTING RL ENVIRONMENT")
     print("=" * 60)
     
     # Setup
