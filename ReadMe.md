@@ -5,40 +5,15 @@ An intelligent educational platform that combines learning style classification 
 ## Table of Contents
 
 1. [Quick Start](#quick-start)
-   - [Prerequisites](#prerequisites)
-   - [Installation](#installation)
 2. [System Overview](#system-overview)
-   - [Core Capabilities](#core-capabilities)
-   - [Technical Architecture](#technical-architecture)
 3. [Project Structure](#project-structure)
 4. [Evaluation Workflows](#evaluation-workflows)
-   - [Complete System Demo](#1-complete-system-demo-recommended-for-academic-review)
-   - [ML Pipeline Validation](#2-ml-pipeline-validation)
-   - [Research Visualizations](#3-research-visualizations)
-   - [Quick Integration Test](#4-quick-integration-test)
 5. [Performance Metrics](#performance-metrics)
-   - [Learning Style Classification Results](#learning-style-classification-results)
-   - [Deep RL Training Configurations](#deep-rl-training-configurations)
 6. [Technical Implementation Details](#technical-implementation-details)
-   - [Machine Learning Pipeline](#machine-learning-pipeline)
-   - [Deep Reinforcement Learning](#deep-reinforcement-learning)
-   - [Web Application Architecture](#web-application-architecture)
 7. [Troubleshooting](#troubleshooting)
-   - [Installation Problems](#installation-problems)
-   - [Model Loading Issues](#model-loading-issues)
-   - [Performance Issues](#performance-issues)
 8. [Research Contributions](#research-contributions)
-   - [Technical Innovations](#technical-innovations)
-   - [Validated Findings](#validated-findings)
-9. [System Validation Checklist](#system-validation-checklist)
-10. [Advanced Usage (Optional)](#advanced-usage-optional)
-    - [Custom RL Training](#custom-rl-training)
-    - [Model Retraining](#model-retraining)
-    - [Data Analysis](#data-analysis)
-11. [Support and Additional Resources](#support-and-additional-resources)
-    - [Key Implementation Files](#key-implementation-files)
-    - [System Requirements](#system-requirements)
-    - [Expected Output Files](#expected-output-files)
+9. [Advanced Usage (Optional)](#advanced-usage-optional)
+10. [Support and Additional Resources](#support-and-additional-resources)
 
 ---
 
@@ -135,11 +110,6 @@ python src/generate_plots.py
 ```
 **Generated**: All publication-quality plots used in thesis documentation
 
-### 4. Quick Integration Test
-```bash
-python src/quickstart_integration.py
-```
-**Purpose**: Verify all components work together correctly
 
 ## Performance Metrics
 
@@ -224,13 +194,6 @@ python src/main_analysis_ls.py
 - **Ensemble Method Effectiveness**: Voting classifiers outperform individual models for Input dimension
 - **RL Training Stability**: Consistent performance across multiple training configurations
 
-## System Validation Checklist
-
-Verify these components work before evaluation:
-
-- [ ] **Web application launches** (`streamlit run src/app.py`)
-- [ ] **Quick integration test passes** (`python src/quickstart_integration.py`)
-- [ ] **Research plots generate** (`python src/generate_plots.py`)
 
 ## Advanced Usage (Optional)
 
@@ -260,7 +223,6 @@ python 4labels-experiment/data_quality_check.py
 - **`src/app.py`** - Main application architecture and user interface
 - **`src/main_analysis_ls.py`** - Complete ML evaluation methodology
 - **`results/metrics/final_results_summary.json`** - Detailed performance metrics
-- **`CLAUDE.md`** - Project configuration and development guidelines
 
 ### System Requirements
 - **Operating System**: Windows 10+, macOS 10.14+, or Linux
