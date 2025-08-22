@@ -11,9 +11,7 @@ An intelligent educational platform that combines learning style classification 
 5. [Performance Metrics](#performance-metrics)
 6. [Technical Implementation Details](#technical-implementation-details)
 7. [Troubleshooting](#troubleshooting)
-8. [Research Contributions](#research-contributions)
-9. [Advanced Usage (Optional)](#advanced-usage-optional)
-10. [Support and Additional Resources](#support-and-additional-resources)
+8. [Support and Additional Resources](#support-and-additional-resources)
 
 ---
 
@@ -104,7 +102,15 @@ python src/main_analysis_ls.py
 ```
 **Outputs**: Complete evaluation metrics, confusion matrices, feature importance analysis
 
-### 3. Research Visualizations
+### 3. Deep RL 
+```bash
+# Different training intensities
+python src/deep_rl_training.py --config standard    # 500 episodes
+python src/deep_rl_training.py --config intensive   # 1451 episodes
+python src/deep_rl_training.py --config research    # 3000 episodes
+```
+
+### 4. Research Visualizations
 ```bash
 python src/generate_plots.py
 ```
@@ -179,43 +185,6 @@ python src/main_analysis_ls.py
 - **Startup Time**: 30-60 seconds (model loading)
 - **Alternative Port**: `streamlit run src/app.py --server.port 8502`
 
-## Research Contributions
-
-### Technical Innovations
-1. **Hybrid Learning Style Assessment**: Combines behavioral inference with questionnaire validation
-2. **Educational Deep RL**: Custom DQN architecture optimized for learning contexts
-3. **Multi-component Reward Design**: Pedagogically grounded reward function balancing multiple objectives
-4. **Uncertainty-Aware Personalization**: Confidence-based adaptation strategies
-5. **Production-Ready Implementation**: Complete web-based system with database integration
-
-### Validated Findings
-- **Feature Engineering Impact**: 10.3% accuracy improvement through theory-driven feature creation
-- **Processing Dimension Limitation**: Statistical analysis proving inadequacy of Moodle data for Active/Reflective classification
-- **Ensemble Method Effectiveness**: Voting classifiers outperform individual models for Input dimension
-- **RL Training Stability**: Consistent performance across multiple training configurations
-
-
-## Advanced Usage (Optional)
-
-### Custom RL Training
-```bash
-# Different training intensities
-python src/deep_rl_training.py --config standard    # 500 episodes
-python src/deep_rl_training.py --config intensive   # 1451 episodes
-python src/deep_rl_training.py --config research    # 3000 episodes
-```
-
-### Model Retraining
-```bash
-# Complete ML pipeline from scratch
-python src/main_analysis_ls.py
-```
-
-### Data Analysis
-```bash
-# Quality analysis and visualizations
-python 4labels-experiment/data_quality_check.py  
-```
 
 ## Support and Additional Resources
 
