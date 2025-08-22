@@ -9,7 +9,6 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime
-import json
 from pathlib import Path
 import time
 from streamlit_ml_integration import StreamlitModelLoader, StreamlitLearningStylePredictor
@@ -718,9 +717,7 @@ elif page == "ℹ️ About":
     - No personal information is shared
     - You can export or delete your data anytime
     
-    **Version**: 1.0  
-    **Author**: Eda Vurmaz
-    **License**: MIT
+   
     """)
 
 # Footer

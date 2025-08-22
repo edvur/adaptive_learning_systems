@@ -248,7 +248,7 @@ class FeaturePipeline:
                  select_features: bool = True,
                  scale_features: bool = True,
                  selection_method: str = 'hybrid',
-                 n_features: int = 35,
+                 n_features: int = 40,
                  scaling_method: str = 'robust'):
         
         self.create_features = create_features

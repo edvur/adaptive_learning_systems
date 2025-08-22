@@ -1,5 +1,11 @@
 """
-main_analysis.py - Main Analysis for 3-Label Learning Style Classification 
+Main Analysis for Learning Style Classification System
+
+This module provides a comprehensive machine learning pipeline for classifying
+learning styles across three dimensions: Perception, Input, and Understanding.
+It includes feature engineering, model training, ensemble methods, and 
+threshold optimization.
+
 """
 
 import pandas as pd
@@ -9,24 +15,41 @@ import seaborn as sns
 import warnings
 import json
 import joblib
-from typing import Dict, Tuple, Any
+import logging
+from typing import Dict, Tuple, Any, Optional
 from pathlib import Path
 from config import get_config
 
-from sklearn.metrics import accuracy_score, f1_score, classification_report, confusion_matrix
-from sklearn.ensemble import VotingClassifier, StackingClassifier, ExtraTreesClassifier, HistGradientBoostingClassifier
+# Scientific computing and ML libraries
+from sklearn.metrics import (
+    accuracy_score, f1_score, confusion_matrix
+)
+from sklearn.ensemble import (
+    VotingClassifier, StackingClassifier, ExtraTreesClassifier, 
+    HistGradientBoostingClassifier
+)
 from sklearn.linear_model import LogisticRegression
 from imblearn.over_sampling import BorderlineSMOTE
 from statsmodels.stats.contingency_tables import mcnemar
-
 
 # Custom modules
 from data_loader_module import DataLoader
 from feature_engineering_module import FeaturePipeline
 from model_definitions_module import ModelDefinitions
-from model_training_module import ModelTrainer, TrainingPipeline
+from model_training_module import ModelTrainer
 
 warnings.filterwarnings('ignore')
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(message)s',
+    handlers=[
+        logging.FileHandler('learning_style_analysis.log'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
 
 # Configuration
 RANDOM_STATE = 42
@@ -43,25 +66,52 @@ DATA_PATH = config.DATA_DIR
 
 
 class LearningStyleAnalysis:
-    """Main Class for the Complete Analysis"""
+    """Main class for comprehensive learning style classification analysis.
+    
+    This class orchestrates the complete machine learning pipeline for learning
+    style classification, including data loading, feature engineering, model 
+    training, ensemble creation, and evaluation.
+    
+    Attributes:
+        data_paths (Dict[str, str]): Paths to data files
+        random_state (int): Random state for reproducibility
+        data (Optional[Dict]): Loaded and processed data
+        feature_pipeline (Optional[FeaturePipeline]): Feature engineering pipeline
+        results (Dict): Analysis results and metrics
+    """
     
     def __init__(self, data_paths: Dict[str, str], random_state: int = 42):
+        """Initialize the Learning Style Analysis.
+        
+        Args:
+            data_paths: Dictionary containing paths to CSMS and CSHS data files
+            random_state: Random state for reproducible results
+        """
         self.data_paths = data_paths
         self.random_state = random_state
-        self.data = None
-        self.feature_pipeline = None
-        self.model_definitions = None
-        self.trainer = None
-        self.results = {}
+        self.data: Optional[Dict] = None
+        self.feature_pipeline: Optional[FeaturePipeline] = None
+        self.model_definitions: Optional[ModelDefinitions] = None
+        self.trainer: Optional[ModelTrainer] = None
+        self.results: Dict[str, Any] = {}
         
     def load_data(self):
-        """Load and analyze Data"""
-        print("="*60)
-        print("1. LOAD DATA AND ANALYZE")
-        print("="*60)
+        """Load and analyze training data from CSMS and CSHS datasets.
         
-        data_loader = DataLoader(self.data_paths['csms'], self.data_paths['cshs'])
-        self.data = data_loader.load_and_prepare()
+        Returns:
+            dict: Processed data including features, labels, and splits
+        """
+        print("=" * 60)
+        print("1. LOADING AND ANALYZING DATA")
+        print("=" * 60)
+        
+        try:
+            data_loader = DataLoader(self.data_paths['csms'], self.data_paths['cshs'])
+            self.data = data_loader.load_and_prepare()
+            logger.info("Data loaded successfully")
+        except Exception as e:
+            logger.error(f"Failed to load data: {str(e)}")
+            raise
         
         print(f"\nData loaded!")
         print(f"Features: {len(self.data['feature_names'])}")
@@ -78,10 +128,17 @@ class LearningStyleAnalysis:
         return self.data
     
     def setup_feature_engineering(self, n_features: int = 40):
-        """Configure Feature Engineering"""
-        print("\n" + "="*60)
+        """Set up and apply feature engineering pipeline.
+        
+        Args:
+            n_features (int): Number of features to select
+            
+        Returns:
+            tuple: Transformed training, validation, and test sets
+        """
+        print("\n" + "=" * 60)
         print("2. FEATURE ENGINEERING")
-        print("="*60)
+        print("=" * 60)
         
         self.feature_pipeline = FeaturePipeline(
             create_features=True,
@@ -93,11 +150,16 @@ class LearningStyleAnalysis:
         )
         
         # Transform features
-        X_train_transformed = self.feature_pipeline.fit_transform(
-            self.data['X_train'], self.data['y_train']
-        )
-        X_val_transformed = self.feature_pipeline.transform(self.data['X_val'])
-        X_test_transformed = self.feature_pipeline.transform(self.data['X_test'])
+        try:
+            X_train_transformed = self.feature_pipeline.fit_transform(
+                self.data['X_train'], self.data['y_train']
+            )
+            X_val_transformed = self.feature_pipeline.transform(self.data['X_val'])
+            X_test_transformed = self.feature_pipeline.transform(self.data['X_test'])
+            logger.info("Feature engineering completed successfully")
+        except Exception as e:
+            logger.error(f"Feature engineering failed: {str(e)}")
+            raise
         
         print(f"\nOriginal features: {self.data['X_train'].shape[1]}")
         print(f"After feature engineering: {X_train_transformed.shape[1]}")
@@ -115,10 +177,14 @@ class LearningStyleAnalysis:
         return X_train_transformed, X_val_transformed, X_test_transformed
     
     def train_baseline_models(self) -> Dict:
-        """Train Baseline-Models"""
-        print("\n" + "="*60)
-        print("3. TRAIN BASELINE-MODELS")
-        print("="*60)
+        """Train baseline machine learning models.
+        
+        Returns:
+            Dict: Results from baseline model training
+        """
+        print("\n" + "=" * 60)
+        print("3. TRAINING BASELINE MODELS")
+        print("=" * 60)
         
         self.model_definitions = ModelDefinitions(self.random_state)
         self.trainer = ModelTrainer(self.random_state)
@@ -162,10 +228,14 @@ class LearningStyleAnalysis:
         return baseline_results
     
     def train_advanced_models(self) -> Dict:
-        """Train advanced Models"""
-        print("\n" + "="*60)
-        print("4. COMPLEX MODELLE (Tree-based & Boosting)")
-        print("="*60)
+        """Train advanced machine learning models with imbalanced data handling.
+        
+        Returns:
+            Dict: Results from advanced model training
+        """
+        print("\n" + "=" * 60)
+        print("4. TRAINING ADVANCED MODELS (Tree-based & Boosting)")
+        print("=" * 60)
         
         # Advanced Models
         advanced_models = self.model_definitions.get_best_models_for_imbalanced()
@@ -233,6 +303,7 @@ class LearningStyleAnalysis:
                     print(f"  {model_name}: Val Acc={val_acc:.4f}, F1={val_f1:.4f}")
                     
                 except Exception as e:
+                    logger.error(f"Error training {model_name}: {str(e)}")
                     print(f"  {model_name}: Error - {str(e)}")
             
             advanced_results[label] = label_results
@@ -241,10 +312,14 @@ class LearningStyleAnalysis:
         return advanced_results
     
     def create_ensemble_models(self) -> Dict:
-        """Create Ensemble-Models"""
-        print("\n" + "="*60)
-        print("5. META-ENSEMBLE-METHODS (Combining Models)")
-        print("="*60)
+        """Create ensemble models using voting and stacking methods.
+        
+        Returns:
+            Dict: Results from ensemble model creation
+        """
+        print("\n" + "=" * 60)
+        print("5. CREATING ENSEMBLE MODELS")
+        print("=" * 60)
         
         # Select best Models for Ensemble
         best_models_per_label = {}
@@ -305,10 +380,14 @@ class LearningStyleAnalysis:
         return ensemble_results
     
     def optimize_thresholds(self) -> Dict:
-        """Optimize decision thresholds"""
-        print("\n" + "="*60)
-        print("6. THRESHOLD-OPTIMIZATION")
-        print("="*60)
+        """Optimize decision thresholds for better F1-scores.
+        
+        Returns:
+            Dict: Optimal thresholds for each dimension
+        """
+        print("\n" + "=" * 60)
+        print("6. OPTIMIZING THRESHOLDS")
+        print("=" * 60)
         
         optimal_thresholds = {}
         
@@ -349,10 +428,14 @@ class LearningStyleAnalysis:
         return optimal_thresholds
     
     def evaluate_final_models(self) -> Tuple[Dict, float]:
-        """Finale Evaluation on Test Set"""
-        print("\n" + "="*60)
-        print("7. FINALE EVALUATION ON TEST SET")
-        print("="*60)
+        """Perform final evaluation on the test set.
+        
+        Returns:
+            Tuple[Dict, float]: Test results and average accuracy
+        """
+        print("\n" + "=" * 60)
+        print("7. FINAL EVALUATION ON TEST SET")
+        print("=" * 60)
         
         # Select finale Models
         final_models = {}
@@ -375,7 +458,7 @@ class LearningStyleAnalysis:
         test_results = {}
         test_predictions = {}
         
-        print("\nFINALE TEST-RESULTS:")
+        print("\nFINAL TEST RESULTS:")
         print("="*60)
         
         for label in self.data['label_names']:
@@ -416,10 +499,8 @@ class LearningStyleAnalysis:
         print(f"Average Test Accuracy: {avg_accuracy:.4f} ({avg_accuracy*100:.2f}%)")
         print(f"Average F1-Score: {avg_f1:.4f}")
         
-        # if avg_accuracy >= 0.85:
-        #     print("\n✅ ZIEL ERREICHT! 85%+ Accuracy!")
-        # else:
-        #     print(f"\n❌ Ziel verfehlt. Differenz: {(0.85 - avg_accuracy)*100:.2f}%")
+        # Include dimension details in final results
+        self.print_performance_metrics()
         
         self.results['test'] = test_results
         self.results['final_models'] = final_models
@@ -429,483 +510,78 @@ class LearningStyleAnalysis:
         
         return test_results, avg_accuracy
     
+    def perform_significance_tests(self):
+        """Perform statistical significance tests between best models."""
+        print("\n" + "=" * 60)
+        print("8. STATISTICAL SIGNIFICANCE TESTING")
+        print("=" * 60)
+        
+        if 'test_predictions' not in self.results or 'ensemble' not in self.results:
+            print("Insufficient data for significance testing")
+            return
+        
+        # Perform McNemar's test for each dimension
+        significance_results = {}
+        
+        for label in self.data['label_names']:
+            print(f"\nTesting significance for {label} dimension:")
+            
+            # Compare best individual vs ensemble (if different)
+            final_model_type = self.results['test'][label]['model_type']
+            
+            if final_model_type != 'best_single':
+                # Get predictions from best individual model
+                best_individual_model = self.results['ensemble'][label]['best_models'][0][1]['model']
+                individual_preds = best_individual_model.predict(self.data['X_test_transformed'])
+                
+                # Get final model predictions
+                final_preds = self.results['test_predictions'][label]
+                y_true = self.data['y_test'][label]
+                
+                # Perform significance test
+                is_significant, p_value = self.test_model_significance(
+                    individual_preds, final_preds, y_true
+                )
+                
+                significance_results[label] = {
+                    'comparison': f'best_individual vs {final_model_type}',
+                    'is_significant': is_significant,
+                    'p_value': p_value
+                }
+            else:
+                print(f"  {label}: Using best individual model - no ensemble comparison needed")
+        
+        # Store results
+        self.results['significance_tests'] = significance_results
+        
+        if significance_results:
+            print("\nSummary of Significance Tests:")
+            for label, result in significance_results.items():
+                status = "significantly different" if result['is_significant'] else "not significantly different"
+                print(f"  {label}: Models are {status} (p = {result['p_value']:.4f})")
+    
     def print_performance_metrics(self):
-        """Print comprehensive performance metrics summary for thesis"""
-        print("\n" + "="*80)
-        print("COMPREHENSIVE PERFORMANCE METRICS SUMMARY")
-        print("="*80)
-        
+        """Print individual dimension performance with model type."""
         if 'test' not in self.results:
-            print("No test results available for metrics summary")
             return
         
-        # Overall System Performance
-        print(f"\n{'='*20} OVERALL SYSTEM PERFORMANCE {'='*20}")
-        print(f"Average Test Accuracy: {self.results['avg_accuracy']:.4f} ({self.results['avg_accuracy']*100:.2f}%)")
-        print(f"Average F1-Score: {self.results['avg_f1']:.4f}")
-        
-        # Performance by Learning Dimension
-        print(f"\n{'='*20} PERFORMANCE BY LEARNING DIMENSION {'='*20}")
+        print("\nDimension Performance Details:")
         for label, metrics in self.results['test'].items():
-            print(f"\n{label} Dimension:")
-            print(f"  ├─ Test Accuracy: {metrics['accuracy']:.4f} ({metrics['accuracy']*100:.2f}%)")
-            print(f"  ├─ F1-Score: {metrics['f1']:.4f}")
-            print(f"  └─ Model Type: {metrics['model_type']}")
-        
-        # Ensemble Performance Analysis
-        if 'ensemble' in self.results:
-            print(f"\n{'='*20} ENSEMBLE MODEL PERFORMANCE {'='*20}")
-            for label in self.data['label_names']:
-                ensemble_info = self.results['ensemble'][label]
-                voting_acc = ensemble_info['voting_soft']['val_accuracy']
-                stacking_acc = ensemble_info['stacking']['val_accuracy']
-                best_individual = ensemble_info['best_models'][0][1]['val_accuracy']
-                
-                print(f"\n{label}:")
-                print(f"  ├─ Best Individual Model: {best_individual:.4f}")
-                print(f"  ├─ Voting Ensemble: {voting_acc:.4f} (+{(voting_acc-best_individual)*100:.1f}%)")
-                print(f"  └─ Stacking Ensemble: {stacking_acc:.4f} (+{(stacking_acc-best_individual)*100:.1f}%)")
-        
-        # Threshold Optimization Results
-        if 'optimal_thresholds' in self.results:
-            print(f"\n{'='*20} THRESHOLD OPTIMIZATION RESULTS {'='*20}")
-            for label, threshold in self.results['optimal_thresholds'].items():
-                print(f"{label}: Optimal threshold = {threshold:.3f}")
-        
-        # Feature Engineering Impact
-        if hasattr(self, 'data') and 'X_train_transformed' in self.data:
-            original_features = len(self.data['feature_names'])
-            final_features = self.data['X_train_transformed'].shape[1]
-            print(f"\n{'='*20} FEATURE ENGINEERING IMPACT {'='*20}")
-            print(f"Original Features: {original_features}")
-            print(f"After Engineering: {final_features}")
-            print(f"Feature Expansion: {final_features/original_features:.1f}x")
-            
-            if hasattr(self.feature_pipeline, 'engineer') and hasattr(self.feature_pipeline.engineer, 'selected_features'):
-                print(f"Selected Features: {len(self.feature_pipeline.engineer.selected_features)}")
-                print(f"\nTop 10 Most Important Features:")
-                for i, feat in enumerate(self.feature_pipeline.engineer.selected_features[:10]):
-                    print(f"  {i+1:2d}. {feat}")
-        
-        # Class Distribution Analysis
-        print(f"\n{'='*20} CLASS DISTRIBUTION ANALYSIS {'='*20}")
-        for label, info in self.data['class_distribution'].items():
-            counts = info['counts']
-            ratio = info['ratio']
-            total = sum(counts.values())
-            majority_class = max(counts.keys(), key=lambda k: counts[k])
-            minority_class = min(counts.keys(), key=lambda k: counts[k])
-            
-            print(f"\n{label}:")
-            print(f"  ├─ Majority Class ({majority_class}): {counts[majority_class]} ({counts[majority_class]/total*100:.1f}%)")
-            print(f"  ├─ Minority Class ({minority_class}): {counts[minority_class]} ({counts[minority_class]/total*100:.1f}%)")
-            print(f"  └─ Imbalance Ratio: {ratio:.2f}:1")
-        
-        # Dataset Statistics
-        print(f"\n{'='*20} DATASET STATISTICS {'='*20}")
-        print(f"Training Samples: {len(self.data['X_train'])}")
-        print(f"Validation Samples: {len(self.data['X_val'])}")
-        print(f"Test Samples: {len(self.data['X_test'])}")
-        print(f"Total Samples: {len(self.data['X_train']) + len(self.data['X_val']) + len(self.data['X_test'])}")
-        
-        # Performance vs Literature Comparison
-        print(f"\n{'='*20} LITERATURE COMPARISON {'='*20}")
-        literature_baselines = {
-            "Traditional ILS Survey": "68-75%",
-            "Basic ML Approaches": "72-78%", 
-            "Advanced ML Methods": "79-83%",
-            "Deep Learning": "81-86%"
-        }
-        
-        our_performance = f"{self.results['avg_accuracy']*100:.1f}%"
-        print(f"Literature Benchmarks vs Our Results:")
-        for method, reported in literature_baselines.items():
-            print(f"  ├─ {method}: {reported}")
-        print(f"  └─ Our System: {our_performance} ✓")
-        
-        # Statistical Significance Summary
-        print(f"\n{'='*20} STATISTICAL SIGNIFICANCE {'='*20}")
-        print("✓ McNemar's test: Ensemble vs Individual models (p < 0.001)")
-        print("✓ Cross-validation stability: σ < 0.03 for all models")
-        print("✓ Performance consistency across random seeds (p = 0.342)")
-        
-        print(f"\n{'='*80}")
-        print("THESIS-READY PERFORMANCE METRICS COMPLETE")
-        print("="*80)
-        
-        # Generate thesis-ready visualizations
-        self.create_thesis_performance_plots()
-    
-    def create_thesis_performance_plots(self):
-        """Create comprehensive thesis-ready performance visualization plots"""
-        print("\nGenerating thesis-ready performance plots...")
-        
-        # Set style for thesis-quality plots
-        plt.style.use('seaborn-v0_8-whitegrid')
-        plt.rcParams.update({
-            'font.size': 12,
-            'font.family': 'serif',
-            'figure.dpi': 300,
-            'savefig.dpi': 300,
-            'savefig.bbox': 'tight',
-            'savefig.facecolor': 'white'
-        })
-        
-        # 1. Performance Overview - Multiple Subplots
-        fig = plt.figure(figsize=(16, 12))
-        
-        # Main performance comparison (top plot)
-        ax1 = plt.subplot(3, 3, (1, 3))
-        dimensions = list(self.results['test'].keys())
-        accuracies = [self.results['test'][dim]['accuracy'] for dim in dimensions]
-        f1_scores = [self.results['test'][dim]['f1'] for dim in dimensions]
-        
-        x = np.arange(len(dimensions))
-        width = 0.35
-        
-        bars1 = ax1.bar(x - width/2, accuracies, width, label='Test Accuracy', 
-                       color='#2E86AB', alpha=0.8, edgecolor='black', linewidth=0.5)
-        bars2 = ax1.bar(x + width/2, f1_scores, width, label='F1-Score', 
-                       color='#A23B72', alpha=0.8, edgecolor='black', linewidth=0.5)
-        
-        ax1.set_ylabel('Performance Score', fontweight='bold')
-        ax1.set_title('Learning Style Classification Performance by Dimension', 
-                     fontsize=14, fontweight='bold', pad=20)
-        ax1.set_xticks(x)
-        ax1.set_xticklabels(dimensions, fontweight='bold')
-        ax1.legend(loc='upper right', frameon=True, fancybox=True, shadow=True)
-        ax1.set_ylim(0, 1)
-        ax1.grid(True, alpha=0.3)
-        
-        # Add value labels on bars
-        for bars in [bars1, bars2]:
-            for bar in bars:
-                height = bar.get_height()
-                ax1.annotate(f'{height:.3f}',
-                           xy=(bar.get_x() + bar.get_width() / 2, height),
-                           xytext=(0, 3),
-                           textcoords="offset points",
-                           ha='center', va='bottom', fontweight='bold')
-        
-        # 2. Class Distribution (subplot 2)
-        ax2 = plt.subplot(3, 3, 4)
-        class_ratios = [self.data['class_distribution'][dim]['ratio'] for dim in dimensions]
-        bars = ax2.bar(dimensions, class_ratios, color=['#F18F01', '#C73E1D', '#592941'], 
-                      alpha=0.8, edgecolor='black', linewidth=0.5)
-        ax2.set_ylabel('Imbalance Ratio', fontweight='bold')
-        ax2.set_title('Class Imbalance by Dimension', fontweight='bold')
-        ax2.set_ylim(0, max(class_ratios) * 1.1)
-        
-        for bar, ratio in zip(bars, class_ratios):
-            ax2.annotate(f'{ratio:.2f}:1',
-                        xy=(bar.get_x() + bar.get_width() / 2, bar.get_height()),
-                        xytext=(0, 3),
-                        textcoords="offset points",
-                        ha='center', va='bottom', fontweight='bold')
-        
-        # 3. Model Type Distribution (subplot 3)
-        ax3 = plt.subplot(3, 3, 5)
-        model_types = [self.results['test'][dim]['model_type'] for dim in dimensions]
-        type_counts = pd.Series(model_types).value_counts()
-        
-        wedges, texts, autotexts = ax3.pie(type_counts.values, labels=type_counts.index, 
-                                          autopct='%1.0f%%', startangle=90,
-                                          colors=['#2E86AB', '#A23B72', '#F18F01'])
-        ax3.set_title('Final Model Type Distribution', fontweight='bold')
-        
-        # 4. Feature Engineering Impact (subplot 4)
-        ax4 = plt.subplot(3, 3, 6)
-        if hasattr(self, 'data') and 'X_train_transformed' in self.data:
-            original_features = len(self.data['feature_names'])
-            final_features = self.data['X_train_transformed'].shape[1]
-            
-            categories = ['Original\nFeatures', 'After\nEngineering', 'Selected\nFeatures']
-            if hasattr(self.feature_pipeline, 'engineer') and hasattr(self.feature_pipeline.engineer, 'selected_features'):
-                selected_features = len(self.feature_pipeline.engineer.selected_features)
-            else:
-                selected_features = final_features
-            
-            values = [original_features, final_features, selected_features]
-            bars = ax4.bar(categories, values, color=['#592941', '#C73E1D', '#F18F01'], 
-                          alpha=0.8, edgecolor='black', linewidth=0.5)
-            ax4.set_ylabel('Number of Features', fontweight='bold')
-            ax4.set_title('Feature Engineering Pipeline', fontweight='bold')
-            
-            for bar, value in zip(bars, values):
-                ax4.annotate(f'{value}',
-                           xy=(bar.get_x() + bar.get_width() / 2, bar.get_height()),
-                           xytext=(0, 3),
-                           textcoords="offset points",
-                           ha='center', va='bottom', fontweight='bold')
-        
-        # 5. Literature Comparison (subplot 5)
-        ax5 = plt.subplot(3, 3, 7)
-        literature_methods = ['Traditional\nILS', 'Basic\nML', 'Advanced\nML', 'Deep\nLearning', 'Our\nSystem']
-        literature_ranges = [(68, 75), (72, 78), (79, 83), (81, 86), None]
-        our_performance = self.results['avg_accuracy'] * 100
-        
-        # Plot ranges as error bars
-        x_pos = np.arange(len(literature_methods))
-        means = [71.5, 75, 81, 83.5, our_performance]
-        errors = [3.5, 3, 2, 2.5, 0]  # Half the range for error bars
-        
-        colors = ['lightgray', 'lightgray', 'lightgray', 'lightgray', '#2E86AB']
-        bars = ax5.bar(x_pos, means, yerr=errors, capsize=5, color=colors, 
-                      alpha=0.8, edgecolor='black', linewidth=0.5)
-        
-        ax5.set_ylabel('Accuracy (%)', fontweight='bold')
-        ax5.set_title('Performance vs Literature', fontweight='bold')
-        ax5.set_xticks(x_pos)
-        ax5.set_xticklabels(literature_methods, rotation=45, ha='right')
-        ax5.set_ylim(60, 90)
-        
-        # Highlight our result
-        bars[-1].set_color('#A23B72')
-        ax5.annotate(f'{our_performance:.1f}%',
-                    xy=(x_pos[-1], our_performance),
-                    xytext=(0, 10),
-                    textcoords="offset points",
-                    ha='center', va='bottom', fontweight='bold', 
-                    fontsize=12, color='red')
-        
-        # 6. Dataset Statistics (subplot 6)
-        ax6 = plt.subplot(3, 3, 8)
-        split_names = ['Training', 'Validation', 'Test']
-        split_sizes = [len(self.data['X_train']), len(self.data['X_val']), len(self.data['X_test'])]
-        
-        wedges, texts, autotexts = ax6.pie(split_sizes, labels=split_names, autopct='%1.1f%%',
-                                          startangle=90, colors=['#2E86AB', '#A23B72', '#F18F01'])
-        ax6.set_title('Dataset Split Distribution', fontweight='bold')
-        
-        # 7. Ensemble Performance Comparison (subplot 7)
-        ax7 = plt.subplot(3, 3, 9)
-        if 'ensemble' in self.results:
-            ensemble_data = []
-            labels = []
-            for dim in dimensions:
-                if dim in self.results['ensemble']:
-                    ensemble_info = self.results['ensemble'][dim]
-                    voting_acc = ensemble_info['voting_soft']['val_accuracy']
-                    stacking_acc = ensemble_info['stacking']['val_accuracy']
-                    best_individual = ensemble_info['best_models'][0][1]['val_accuracy']
-                    
-                    ensemble_data.append([best_individual, voting_acc, stacking_acc])
-                    labels.append(dim)
-            
-            if ensemble_data:
-                ensemble_data = np.array(ensemble_data)
-                x = np.arange(len(labels))
-                width = 0.25
-                
-                ax7.bar(x - width, ensemble_data[:, 0], width, label='Best Individual', 
-                       color='#592941', alpha=0.8)
-                ax7.bar(x, ensemble_data[:, 1], width, label='Voting Ensemble', 
-                       color='#C73E1D', alpha=0.8)
-                ax7.bar(x + width, ensemble_data[:, 2], width, label='Stacking Ensemble', 
-                       color='#F18F01', alpha=0.8)
-                
-                ax7.set_ylabel('Validation Accuracy', fontweight='bold')
-                ax7.set_title('Ensemble vs Individual Models', fontweight='bold')
-                ax7.set_xticks(x)
-                ax7.set_xticklabels(labels)
-                ax7.legend(loc='upper right', fontsize=10)
-                ax7.set_ylim(0.7, 0.9)
-        
-        plt.tight_layout()
-        FIGURES_PATH.mkdir(parents=True, exist_ok=True)
-        plt.savefig(FIGURES_PATH / 'thesis_performance_overview.png', dpi=300, bbox_inches='tight')
-        plt.close()
-        
-        # 2. Feature Importance Plot
-        self.create_feature_importance_plot()
-        
-        # 3. Detailed Confusion Matrices
-        self.create_detailed_confusion_matrices()
-        
-        # 4. Learning Curves Simulation Plot
-        self.create_learning_curves_plot()
-        
-        print("✓ Thesis-ready performance plots generated:")
-        print(f"  - {FIGURES_PATH / 'thesis_performance_overview.png'}")
-        print(f"  - {FIGURES_PATH / 'thesis_feature_importance.png'}")
-        print(f"  - {FIGURES_PATH / 'thesis_confusion_matrices.png'}")
-        print(f"  - {FIGURES_PATH / 'thesis_learning_curves.png'}")
-    
-    def create_feature_importance_plot(self):
-        """Create feature importance visualization"""
-        if not (hasattr(self.feature_pipeline, 'engineer') and 
-                hasattr(self.feature_pipeline.engineer, 'selected_features')):
-            return
-        
-        fig, axes = plt.subplots(1, 3, figsize=(18, 6))
-        
-        # Get top features for each dimension (simulated importance scores)
-        dimensions = ['Perception', 'Input', 'Understanding']
-        top_features_per_dim = {
-            'Perception': ['concrete_abstract_ratio', 'practical_theoretical_ratio', 'reflective_learning_score', 
-                          'Concrete material', 'Abstract materiale'],
-            'Input': ['visual_text_ratio', 'video_engagement_rate', 'visual_preference_score', 
-                     'Visual Materials', 'Reading file'],
-            'Understanding': ['overview_depth_ratio', 'structured_learning_score', 'completion_rate', 
-                            'Course overview', 'progression_rate']
-        }
-        
-        importance_scores = {
-            'Perception': [0.284, 0.267, 0.189, 0.156, 0.104],
-            'Input': [0.312, 0.298, 0.201, 0.143, 0.046],
-            'Understanding': [0.341, 0.289, 0.198, 0.112, 0.060]
-        }
-        
-        for i, dim in enumerate(dimensions):
-            features = top_features_per_dim[dim]
-            scores = importance_scores[dim]
-            
-            y_pos = np.arange(len(features))
-            colors = plt.cm.viridis(np.linspace(0.2, 0.8, len(features)))
-            
-            bars = axes[i].barh(y_pos, scores, color=colors, alpha=0.8, edgecolor='black', linewidth=0.5)
-            axes[i].set_yticks(y_pos)
-            axes[i].set_yticklabels([f.replace('_', ' ').title() for f in features])
-            axes[i].set_xlabel('Feature Importance', fontweight='bold')
-            axes[i].set_title(f'{dim} Dimension\nTop 5 Features', fontweight='bold')
-            axes[i].set_xlim(0, max(scores) * 1.1)
-            
-            # Add value labels
-            for bar, score in zip(bars, scores):
-                axes[i].annotate(f'{score:.3f}',
-                               xy=(bar.get_width(), bar.get_y() + bar.get_height()/2),
-                               xytext=(3, 0),
-                               textcoords="offset points",
-                               ha='left', va='center', fontweight='bold')
-        
-        plt.tight_layout()
-        plt.savefig(FIGURES_PATH / 'thesis_feature_importance.png', dpi=300, bbox_inches='tight')
-        plt.close()
-    
-    def create_detailed_confusion_matrices(self):
-        """Create detailed confusion matrices with statistics"""
-        fig, axes = plt.subplots(2, 3, figsize=(15, 10))
-        
-        dimensions = list(self.results['test'].keys())
-        
-        for i, dim in enumerate(dimensions):
-            # Confusion matrix
-            ax_cm = axes[0, i]
-            cm = confusion_matrix(
-                self.data['y_test'][dim], 
-                self.results['test_predictions'][dim]
-            )
-            
-            sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax_cm,
-                       cbar_kws={'label': 'Count'}, 
-                       annot_kws={'fontsize': 14, 'fontweight': 'bold'})
-            ax_cm.set_title(f'{dim} Dimension\nAccuracy: {self.results["test"][dim]["accuracy"]:.3f}',
-                           fontsize=12, fontweight='bold')
-            ax_cm.set_xlabel('Predicted Label', fontweight='bold')
-            ax_cm.set_ylabel('True Label', fontweight='bold')
-            
-            # Performance metrics bar chart
-            ax_metrics = axes[1, i]
-            metrics = ['Accuracy', 'F1-Score', 'Precision', 'Recall']
-            
-            # Calculate precision and recall
-            tn, fp, fn, tp = cm.ravel()
-            precision = tp / (tp + fp) if (tp + fp) > 0 else 0
-            recall = tp / (tp + fn) if (tp + fn) > 0 else 0
-            
-            values = [
-                self.results['test'][dim]['accuracy'],
-                self.results['test'][dim]['f1'],
-                precision,
-                recall
-            ]
-            
-            colors = ['#2E86AB', '#A23B72', '#F18F01', '#C73E1D']
-            bars = ax_metrics.bar(metrics, values, color=colors, alpha=0.8, 
-                                edgecolor='black', linewidth=0.5)
-            ax_metrics.set_ylabel('Score', fontweight='bold')
-            ax_metrics.set_title(f'{dim} Performance Metrics', fontweight='bold')
-            ax_metrics.set_ylim(0, 1)
-            ax_metrics.tick_params(axis='x', rotation=45)
-            plt.setp(ax_metrics.get_xticklabels(), ha='right')
-            
-            # Add value labels
-            for bar, value in zip(bars, values):
-                ax_metrics.annotate(f'{value:.3f}',
-                                  xy=(bar.get_x() + bar.get_width() / 2, bar.get_height()),
-                                  xytext=(0, 3),
-                                  textcoords="offset points",
-                                  ha='center', va='bottom', fontweight='bold')
-        
-        plt.tight_layout()
-        plt.savefig(FIGURES_PATH / 'thesis_confusion_matrices.png', dpi=300, bbox_inches='tight')
-        plt.close()
-    
-    def create_learning_curves_plot(self):
-        """Create learning curves visualization (simulated data)"""
-        fig, axes = plt.subplots(2, 2, figsize=(14, 10))
-        
-        # Simulated learning curves data
-        epochs = np.arange(1, 51)
-        
-        # Training and validation curves for different aspects
-        curves_data = {
-            'Model Performance': {
-                'train_acc': 0.6 + 0.3 * (1 - np.exp(-epochs/10)) + np.random.normal(0, 0.01, len(epochs)),
-                'val_acc': 0.55 + 0.28 * (1 - np.exp(-epochs/12)) + np.random.normal(0, 0.015, len(epochs)),
-                'ylabel': 'Accuracy'
-            },
-            'Loss Convergence': {
-                'train_loss': 0.7 * np.exp(-epochs/8) + np.random.normal(0, 0.02, len(epochs)),
-                'val_loss': 0.75 * np.exp(-epochs/10) + np.random.normal(0, 0.025, len(epochs)),
-                'ylabel': 'Loss'
-            },
-            'F1-Score Evolution': {
-                'train_f1': 0.58 + 0.25 * (1 - np.exp(-epochs/9)) + np.random.normal(0, 0.012, len(epochs)),
-                'val_f1': 0.53 + 0.23 * (1 - np.exp(-epochs/11)) + np.random.normal(0, 0.018, len(epochs)),
-                'ylabel': 'F1-Score'
-            },
-            'Cross-Validation Stability': {
-                'cv_mean': 0.75 + 0.1 * (1 - np.exp(-epochs/15)) + np.random.normal(0, 0.008, len(epochs)),
-                'cv_std': 0.05 * np.exp(-epochs/20) + np.random.normal(0, 0.002, len(epochs)),
-                'ylabel': 'CV Score'
-            }
-        }
-        
-        positions = [(0, 0), (0, 1), (1, 0), (1, 1)]
-        
-        for idx, (title, data) in enumerate(curves_data.items()):
-            ax = axes[positions[idx]]
-            
-            if title == 'Cross-Validation Stability':
-                # Special handling for CV plot
-                ax.plot(epochs, data['cv_mean'], 'b-', linewidth=2, label='CV Mean', alpha=0.8)
-                ax.fill_between(epochs, 
-                              data['cv_mean'] - data['cv_std'], 
-                              data['cv_mean'] + data['cv_std'], 
-                              alpha=0.3, color='blue', label='CV Std')
-                ax.set_ylim(0.6, 0.9)
-            else:
-                # Regular train/val plots
-                key1, key2 = list(data.keys())[:2]
-                ax.plot(epochs, data[key1], 'b-', linewidth=2, label=key1.replace('_', ' ').title(), alpha=0.8)
-                ax.plot(epochs, data[key2], 'r--', linewidth=2, label=key2.replace('_', ' ').title(), alpha=0.8)
-            
-            ax.set_xlabel('Training Epoch', fontweight='bold')
-            ax.set_ylabel(data['ylabel'], fontweight='bold')
-            ax.set_title(title, fontweight='bold')
-            ax.legend(frameon=True, fancybox=True, shadow=True)
-            ax.grid(True, alpha=0.3)
-        
-        plt.tight_layout()
-        plt.savefig(FIGURES_PATH / 'thesis_learning_curves.png', dpi=300, bbox_inches='tight')
-        plt.close()
+            print(f"  {label}: {metrics['accuracy']:.4f} ({metrics['accuracy']*100:.1f}%) using {metrics['model_type']}")
     
     def test_model_significance(self, model1_preds, model2_preds, y_true):
-        """McNemar's test for model comparison"""
-        print("\n" + "="*60)
-        print("8. SIGNIFICANCE TEST (McNemar's)")
-        print("="*60)        
+        """Perform McNemar's test for statistical model comparison.
+        
+        Args:
+            model1_preds: Predictions from first model
+            model2_preds: Predictions from second model
+            y_true: True labels
+            
+        Returns:
+            Tuple[bool, float]: Significance result and p-value
+        """
+        print(f"\n  McNemar's Test: {model1_preds.shape[0]} samples")
+        print(f"  Comparing predictions between two models...")        
         # Create contingency table
         correct1 = model1_preds == y_true
         correct2 = model2_preds == y_true
@@ -919,81 +595,79 @@ class LearningStyleAnalysis:
         result = mcnemar([[a, b], [c, d]], exact=False, correction=True)
         
         is_significant = result.pvalue < 0.05
-        print(f"McNemar's test: p-value = {result.pvalue:.4f}")
-        print(f"Models are {'significantly' if is_significant else 'not significantly'} different")
+        print(f"  McNemar's test: p-value = {result.pvalue:.4f}")
+        print(f"  Result: Models are {'significantly' if is_significant else 'not significantly'} different")
         
         return is_significant, result.pvalue
     
     def create_visualizations(self):
-        """Create Visualizations"""
-        print("\n" + "="*60)
-        print("9. VISUALISATIONS")
-        print("="*60)
+        """Create comprehensive visualizations for analysis results."""
+        print("\n" + "=" * 60)
+        print("9. CREATING VISUALIZATIONS")
+        print("=" * 60)
         
-        # Confusion Matrices
-        fig, axes = plt.subplots(1, 3, figsize=(15, 5))
-        
-        for i, label in enumerate(self.data['label_names']):
-            cm = confusion_matrix(
-                self.data['y_test'][label], 
-                self.results['test_predictions'][label]
-            )
+        try:
+            # Try to import and run the thesis plot generator
+            from generate_plots import ThesisPlotGenerator
             
-            sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=axes[i])
-            axes[i].set_title(f'{label}\nAccuracy: {self.results["test"][label]["accuracy"]:.3f}')
-            axes[i].set_xlabel('Predicted')
-            axes[i].set_ylabel('Actual')
-        
-        plt.tight_layout()
-        FIGURES_PATH.mkdir(parents=True, exist_ok=True)
-        plt.savefig(FIGURES_PATH / 'confusion_matrices_final.png', dpi=300)
-        plt.close()
-        
-        # Results Overview
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
-        
-        # Accuracy pro Label
-        labels = list(self.results['test'].keys())
-        accuracies = [self.results['test'][label]['accuracy'] for label in labels]
-        colors = ['green' if acc >= 0.85 else 'orange' if acc >= 0.80 else 'red' 
-                  for acc in accuracies]
-        
-        bars = ax1.bar(labels, accuracies, color=colors)
-        ax1.set_ylabel('Accuracy')
-        ax1.set_title('Test Accuracy pro Label')
-        ax1.set_ylim(0, 1)
-        
-        # Values on Bars
-        for bar, acc in zip(bars, accuracies):
-            height = bar.get_height()
-            ax1.text(bar.get_x() + bar.get_width()/2., height + 0.01,
-                     f'{acc:.3f}', ha='center', va='bottom')
-        
-        # Model Type Distribution
-        model_types = [self.results['test'][label]['model_type'] for label in labels]
-        type_counts = pd.Series(model_types).value_counts()
-        
-        ax2.pie(type_counts.values, labels=type_counts.index, autopct='%1.0f%%')
-        ax2.set_title('Used Model Types')
-        
-        plt.tight_layout()
-        plt.savefig(FIGURES_PATH / 'final_results_overview.png', dpi=300)
-        plt.close()
-        
-        print("Visualization created and saved!")
+            generator = ThesisPlotGenerator(str(Path(__file__).parent.parent))
+            generator.generate_all_plots()
+            print("✓ All thesis plots generated successfully!")
+                
+        except ImportError:
+            logger.warning("generate_plots.py not found, creating simple plots...")
+            self.create_simple_plots()
+        except Exception as e:
+            logger.error(f"Failed to generate plots: {str(e)}")
+            print("❌ Visualization generation failed, creating simple plots...")
+            self.create_simple_plots()
+    
+    def create_simple_plots(self):
+        """Create simple visualization plots."""
+        try:
+            # Simple confusion matrix plot
+            fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+            
+            for i, label in enumerate(self.data['label_names']):
+                if 'test_predictions' in self.results:
+                    cm = confusion_matrix(
+                        self.data['y_test'][label], 
+                        self.results['test_predictions'][label]
+                    )
+                    
+                    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=axes[i])
+                    axes[i].set_title(f'{label}\nAccuracy: {self.results["test"][label]["accuracy"]:.3f}')
+                    axes[i].set_xlabel('Predicted')
+                    axes[i].set_ylabel('Actual')
+            
+            plt.tight_layout()
+            FIGURES_PATH.mkdir(parents=True, exist_ok=True)
+            plt.savefig(FIGURES_PATH / 'confusion_matrices_simple.png', dpi=300)
+            plt.close()
+            
+            print("✓ Simple plots created successfully")
+        except Exception as e:
+            logger.warning(f"Simple plot creation failed: {str(e)}")
+            print("⚠️ Plot creation had issues")
     
     def save_results(self):
         """Save all Results and Models"""
-        print("\n" + "="*60)
-        print("10. SAVE RESULTS")
-        print("="*60)
+        print("\n" + "=" * 60)
+        print("10. SAVING RESULTS")
+        print("=" * 60)
         
-        # Save finale Models
-        MODELS_PATH.mkdir(parents=True, exist_ok=True)
-        for label in self.data['label_names']:
-            model_type, model_info = self.results['final_models'][label]
-            joblib.dump(model_info['model'], MODELS_PATH / f'final_model_{label}.pkl')
-            print(f"Model saved for {label}")
+        # Save final Models
+        try:
+            MODELS_PATH.mkdir(parents=True, exist_ok=True)
+            for label in self.data['label_names']:
+                model_type, model_info = self.results['final_models'][label]
+                model_path = MODELS_PATH / f'final_model_{label}.pkl'
+                joblib.dump(model_info['model'], model_path)
+                logger.info(f"Model saved for {label} at {model_path}")
+                print(f"Model saved for {label}")
+        except Exception as e:
+            logger.error(f"Failed to save models: {str(e)}")
+            raise
         
         # Save Feature Pipeline
         joblib.dump(self.feature_pipeline, MODELS_PATH / 'feature_pipeline.pkl')
@@ -1016,9 +690,9 @@ class LearningStyleAnalysis:
     
     def run_complete_analysis(self):
         """Run Complete Analysis"""
-        print("\n" + "="*80)
-        print("Learning Style Classification - 3 LABELS")
-        print("="*80)
+        print("\n" + "=" * 80)
+        print("LEARNING STYLE CLASSIFICATION - 3 DIMENSIONS")
+        print("=" * 80)
         
         # 1. Data loading and analysis
         self.load_data()
@@ -1038,34 +712,42 @@ class LearningStyleAnalysis:
         # 6. Threshold-Optimization
         self.optimize_thresholds()
         
-        # 7. Finale Evaluation
+        # 7. Final Evaluation
         test_results, avg_accuracy = self.evaluate_final_models()
         
-        # 8. Performance Metrics Summary
-        self.print_performance_metrics()
+        # 8. Statistical Significance Testing
+        self.perform_significance_tests()
         
-        # 9. Visualizaitons
+        # 9. Create Visualizations
         self.create_visualizations()
         
         # 10. Save Results
         self.save_results()
         
-        
         return avg_accuracy
 
 
 def main():
-    # Path to Data
+    """Main function to run the complete learning style analysis."""
+    logger.info("Starting Learning Style Classification Analysis")
+    
+    # Setup data paths
     data_paths = {
         'csms': str(config.get_data_path('csms')),
         'cshs': str(config.get_data_path('cshs'))
     }
     
-    # Create + Analysis
-    analysis = LearningStyleAnalysis(data_paths, RANDOM_STATE)
-    final_accuracy = analysis.run_complete_analysis()
-    
-    print(f"\n\nAnalysis completed! Finale Accuracy: {final_accuracy:.2%}")
+    try:
+        # Create and run analysis
+        analysis = LearningStyleAnalysis(data_paths, RANDOM_STATE)
+        final_accuracy = analysis.run_complete_analysis()
+        
+        logger.info(f"Analysis completed successfully! Final Accuracy: {final_accuracy:.2%}")
+        print(f"\n\nAnalysis completed! Final Accuracy: {final_accuracy:.2%}")
+        
+    except Exception as e:
+        logger.error(f"Analysis failed: {str(e)}")
+        raise
 
 
 if __name__ == "__main__":
