@@ -11,8 +11,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.naive_bayes import GaussianNB
 
 # Tree-based models (the best for this dataset)
-from sklearn.ensemble import (
-    RandomForestClassifier, 
+from sklearn.ensemble import ( 
     GradientBoostingClassifier,
     HistGradientBoostingClassifier
 )
@@ -35,7 +34,7 @@ class ModelDefinitions:
     def __init__(self, random_state: int = 42):
         self.random_state = random_state
         
-    def get_simple_models(self) -> Dict[str, Any]:
+    def get_baseline_models(self) -> Dict[str, Any]:
         """
         Only 2 baseline models:
         - Logistic Regression: Baseline, interpretable
@@ -51,7 +50,7 @@ class ModelDefinitions:
             'GaussianNB': GaussianNB()
         }
     
-    def get_ensemble_models(self) -> Dict[str, Any]:
+    def get_tree_based_models(self) -> Dict[str, Any]:
         """
         Top 3 ensemble models for this dataset:
         1. BalancedRandomForest: Specifically for imbalanced data
@@ -86,7 +85,7 @@ class ModelDefinitions:
             )
         }
     
-    def get_advanced_models(self) -> Dict[str, Any]:
+    def get_boosting_models(self) -> Dict[str, Any]:
         """
         XGBoost and LightGBM - The best for tabular data
         Only if installed
@@ -129,16 +128,16 @@ class ModelDefinitions:
     def get_all_models(self) -> Dict[str, Any]:
         """Returns all available models"""
         all_models = {}
-        all_models.update(self.get_simple_models())
-        all_models.update(self.get_ensemble_models())
-        all_models.update(self.get_advanced_models())
+        all_models.update(self.get_baseline_models())
+        all_models.update(self.get_tree_based_models())
+        all_models.update(self.get_boosting_models())
         return all_models
     
     def get_quick_test_models(self) -> Dict[str, Any]:
         """Fast models for initial tests"""
         return {
-            'LogisticRegression': self.get_simple_models()['LogisticRegression'],
-            'GaussianNB': self.get_simple_models()['GaussianNB']
+            'LogisticRegression': self.get_baseline_models()['LogisticRegression'],
+            'GaussianNB': self.get_baseline_models()['GaussianNB']
         }
     
     def get_best_models_for_imbalanced(self) -> Dict[str, Any]:
@@ -151,19 +150,19 @@ class ModelDefinitions:
         """
         models = {
             # Best for imbalanced data
-            'BalancedRandomForest': self.get_ensemble_models()['BalancedRandomForest'],
+            'BalancedRandomForest': self.get_tree_based_models()['BalancedRandomForest'],
             
             # Fast and efficient
-            'HistGradientBoosting': self.get_ensemble_models()['HistGradientBoosting']
+            'HistGradientBoosting': self.get_tree_based_models()['HistGradientBoosting']
         }
         
         # Add XGBoost/LightGBM if available (very good for tabular data)
         if ADVANCED_MODELS_AVAILABLE:
-            models['XGBoost'] = self.get_advanced_models()['XGBoost']
-            models['LightGBM'] = self.get_advanced_models()['LightGBM']
+            models['XGBoost'] = self.get_boosting_models()['XGBoost']
+            models['LightGBM'] = self.get_boosting_models()['LightGBM']
         else:
             # Fallback to GradientBoosting
-            models['GradientBoosting'] = self.get_ensemble_models()['GradientBoosting']
+            models['GradientBoosting'] = self.get_tree_based_models()['GradientBoosting']
         
         return models
     
@@ -229,15 +228,15 @@ if __name__ == "__main__":
     print("=== MODEL OVERVIEW ===\n")
     
     print("1. Baseline Models (2):")
-    for name in model_defs.get_simple_models().keys():
+    for name in model_defs.get_baseline_models().keys():
         print(f"   - {name}: {model_defs.get_model_description(name)}")
     
-    print("\n2. Ensemble Models (3):")
-    for name in model_defs.get_ensemble_models().keys():
+    print("\n2. Tree-based Models (3):")
+    for name in model_defs.get_tree_based_models().keys():
         print(f"   - {name}: {model_defs.get_model_description(name)}")
     
-    print("\n3. Advanced Models (if installed):")
-    advanced = model_defs.get_advanced_models()
+    print("\n3. Boosting Models (if installed):")
+    advanced = model_defs.get_boosting_models()
     if advanced:
         for name in advanced.keys():
             print(f"   - {name}: {model_defs.get_model_description(name)}")

@@ -2,7 +2,7 @@
 integration_step1.py - Bridge between existing Models and Tutoring-System
 """
 
-import os
+
 import sys
 import pandas as pd
 import numpy as np

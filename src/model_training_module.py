@@ -3,7 +3,6 @@ model_training.py - Module for model training and hyperparameter optimization
 """
 
 import pandas as pd
-import numpy as np
 from typing import Dict, List, Tuple, Any
 from sklearn.model_selection import cross_val_score, GridSearchCV, RandomizedSearchCV
 from sklearn.metrics import accuracy_score
@@ -16,6 +15,7 @@ import logging
 from concurrent.futures import ProcessPoolExecutor
 import warnings
 warnings.filterwarnings('ignore')
+
 
 logger = logging.getLogger(__name__)
 

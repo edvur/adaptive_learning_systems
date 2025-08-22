@@ -12,8 +12,7 @@ import torch
 import torch.nn as nn
 from pathlib import Path
 import logging
-from typing import Dict, List, Tuple, Optional
-import json
+from typing import Dict, List, Optional
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)

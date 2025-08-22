@@ -3,7 +3,6 @@ data_loader.py - module for data loading and preprocessing
 """
 
 import pandas as pd
-import numpy as np
 from sklearn.model_selection import train_test_split
 from typing import Tuple, Dict
 import logging
